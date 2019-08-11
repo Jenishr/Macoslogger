@@ -1,0 +1,48 @@
+#!/bin/bash
+#Developer: Jenish.r
+echo ======================================
+echo MACAgent Integrator
+echo ======================================
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd "${DIR}"
+ echo "Enter Your desired password SysAdmin:"
+ echo "Note: This Account will be created in all machine where MACAGENT is installed"
+
+ read -p "Password: " -s PASSWORD
+
+while [[ $repass != "$PASSWORD" ]] || [[ $repass == '' ]]
+do
+echo ""
+	read -p  "Re-Enter Password:" -s repass
+done
+echo ""
+echo "Please provide MACAgent Manager IP address"
+read IP
+echo "Please enter the Eventracker Manager Port number [Default: 514]:"
+read Port
+echo "Please enter the protocol used for syslog [Default: UDP]"
+read Protocol
+
+if [ -z "$Port" ]; then
+	Port="514"
+fi
+if [ -z "$Protocol" ]; then
+	Protocol="UDP"
+fi
+echo "Saving configuration to file..."
+echo "userpasswd=$PASSWORD
+ip=$IP
+port=$Port
+protocol=$Protocol" > build/files/config.sys
+
+
+echo "Creating Package....."
+pkgbuild --root build/ --scripts build/Scripts/ --identifier com.MACAgent.MACAGENT.pkg --install-location /tmp/ --version 2.0 MACAGENT.pkg
+
+echo "Package Created! Package Name: MACAGENT.pkg"
+
+rm -rf build/files/config.sys
+echo "Configuration Completed!"
+
+exit 0

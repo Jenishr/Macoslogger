@@ -1,0 +1,60 @@
+#!/bin/bash
+# ===============================
+# EventTracker Agent installation
+# ===============================
+#Script="${BASH_SOURCE[0]}"
+#Path="dirname $(readlink -f "$0")"
+#echo $Path
+ScriptPath=/tmp/files/config.sys
+#ScriptPath=$(realpath `which $Script`)
+#echo $Script
+#echo $ScriptPath
+if [[ $(dscl . list	/Users) =~ "SysAdmin" ]]; then
+	echo "SysAdmin user is already existed"
+else
+	UserName="SysAdmin"
+	FullName="SysAdmin"
+	#echo "Enter Your desired password SysAdmin24:"
+	#read -s PASSWORD
+	PASSWORD=$(grep userpasswd $ScriptPath | cut -d '=' -f 2)
+	#echo $PASSWORD
+	Maxid=$(dscl . -list /Users UniqueID | awk '{print $2}' | sort -ug | tail -1)
+	UserId=$((Maxid+1))
+	dscl . -create /Users/$UserName IsHidden 1
+	dscl . -create /Users/$UserName UserShell /bin/bash
+	dscl . -create /Users/$UserName RealName "$UserName"
+	dscl . -create /Users/$UserName UniqueID "$UserId"
+	dscl . -create /Users/$UserName PrimaryGroupID 20
+	dscl . -create /Users/$UserName NFSHomeDirectory /Users/$UserName
+	dscl . -passwd /Users/$UserName "$PASSWORD"
+	createhomedir -c 2>&1 | grep -v "shell-init"
+fi
+if ! grep -q AUDITOR /etc/sudoers; then
+	echo -e "Cmnd_Alias\tAUDITOR = /usr/sbin/auditreduce, /usr/sbin/praudit, /usr/bin/python\nSysAdmin\tALL = (ALL) NOPASSWD:AUDITOR" >> /etc/sudoers
+fi
+
+sed -i.bak 's/^flags.*$/flags:lo,ex,ad,aa/' /etc/security/audit_control
+
+sed -i.bak 's/^267:/#267:/' /etc/security/audit_event
+
+sed -i.bak2 's/^43127:/#43127:/' /etc/security/audit_event
+
+
+audit -s
+
+
+if [ ! -d "/Users/SysAdmin/Integrator" ]
+	then
+	mkdir /Users/SysAdmin/Integrator
+	IP=$(grep ip $ScriptPath | cut -d '=' -f 2)
+	Port=$(grep port $ScriptPath | cut -d '=' -f 2)
+	Protocol=$(grep protocol $ScriptPath | cut -d '=' -f 2)
+	if [ -z "$Protocol" ]; then
+		Protocol="UDP"
+	fi
+	echo -e "[SyslogManager]\Sysconfig manager ip address = "$IP"\nPort = "$Port"\nProtocol = "$Protocol"\nlastsend = " > /Users/SysAdmin/Integrator/Sysconfig.ini
+	cp /tmp/files/MACAgent.py /Users/SysAdmin/Integrator/MACAgent.py
+	chmod +x /Users/SysAdmin/Integrator/MACAgent.py
+	echo "*/1 * * * * "/usr/bin/sudo /usr/bin/python /Users/SysAdmin/Integrator/MACAgent.py"" | crontab -u SysAdmin -
+fi
+rm -rf /tmp/files/config.sys
